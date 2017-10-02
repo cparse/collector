@@ -5,6 +5,10 @@
 #define private public
 #endif
 
+#ifndef ORGANIZATION_THRESHOLD
+#define ORGANIZATION_THRESHOLD 0.5
+#endif
+
 namespace collector {
 
 typedef bool any_type;
@@ -71,6 +75,11 @@ struct Collector {
     mark();
     // Delete any token that could not be marked:
     sweep();
+
+    // Organize:
+    if (count_empty_space() > memory.size() * ORGANIZATION_THRESHOLD) {
+      organize_memory();
+    }
   }
 
  private:
@@ -101,6 +110,34 @@ struct Collector {
       // When we leave the loop `ref` loses its last reference
       // and should be deleted.
     }
+  }
+
+  size_t count_empty_space() {
+    size_t empty_refs = 0;
+
+    for (const wRef_t& wref : memory) {
+      Ref_t ref = wref.lock();
+
+      if (!ref) {
+        empty_refs++;
+      }
+    }
+
+    return empty_refs;
+  }
+
+  void organize_memory() {
+    int next = 0;
+
+    for (const wRef_t& wref : memory) {
+      Ref_t ref = wref.lock();
+
+      if (ref) {
+        memory[next++] = wref;
+      }
+    }
+
+    memory.resize(next);
   }
 
  private:

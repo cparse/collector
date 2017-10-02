@@ -89,7 +89,7 @@ TEST_CASE("Test add function", "[add]") {
   REQUIRE(count_mem<Data_t>() == 0);
 }
 
-TEST_CASE("Test root_add function", "[add-root]") {
+TEST_CASE("Test root_add function", "[add_root]") {
   static Collector<Data_t>& collector = Collector<Data_t>::Collectable::collector;
 
   {
@@ -137,7 +137,7 @@ struct Test_t : public Collector<Test_t>::CollectableData {
   }
 };
 
-TEST_CASE("Test mark_callback function", "[mark-callback]") {
+TEST_CASE("Test mark_callback function", "[mark_callback]") {
   typedef Collector<Test_t> collector_t;
   typedef Collector<Test_t>::Ref_t Ref_t;
 
@@ -167,7 +167,7 @@ TEST_CASE("Test mark_callback function", "[mark-callback]") {
   REQUIRE(t1->ca_count == 1);
 }
 
-TEST_CASE("Test reset_callback function", "[reset-callback]") {
+TEST_CASE("Test reset_callback function", "[reset_callback]") {
   typedef Collector<Test_t> collector_t;
   typedef Collector<Test_t>::Ref_t Ref_t;
 
@@ -255,6 +255,65 @@ TEST_CASE("Test mark_and_sweep() method", "[mark_and_sweep]") {
   REQUIRE(r2->collector_mark == 42);
 }
 
+TEST_CASE("Test organize_memory() method", "[organize_memory]") {
+  typedef Collector<Test_t> collector_t;
+  typedef Collector<Test_t>::Ref_t Ref_t;
+
+  static collector_t& collector = collector_t::Collectable::collector;
+
+  SECTION("Testing the function directly") {
+    collector.root_list.clear();
+    collector.memory.clear();
+
+    Ref_t r1 = collector.add();
+    Ref_t r2 = collector.add();
+    {
+      Ref_t r3 = collector.add();
+      Ref_t r4 = collector.add();
+      Ref_t r5 = collector.add();
+      Ref_t r6 = collector.add();
+      REQUIRE(collector.memory.size() == 6);
+      REQUIRE(count_mem<Test_t>() == 6);
+    }
+    REQUIRE(count_mem<Test_t>() == 2);
+
+    Ref_t r7 = collector.add();
+    Ref_t r8 = collector.add();
+    REQUIRE(count_mem<Test_t>() == 4);
+    REQUIRE(collector.memory.size() == 8);
+
+    REQUIRE_NOTHROW(collector.organize_memory());
+
+    REQUIRE(count_mem<Test_t>() == 4);
+    REQUIRE(collector.memory.size() == 4);
+  }
+
+  SECTION("Testing the through a mark_and_sweep call") {
+    collector.root_list.clear();
+    collector.memory.clear();
+
+    Ref_t r2 = collector.add();
+    {
+      // These will be deleted by the
+      // reference counting as soon
+      // as the scope ends:
+      Ref_t r3 = collector.add();
+      Ref_t r4 = collector.add();
+      Ref_t r5 = collector.add();
+      Ref_t r6 = collector.add();
+    }
+    Ref_t r7 = collector.add();
+    Ref_t r8 = collector.add();
+    REQUIRE(count_mem<Test_t>() == 3);
+    REQUIRE(collector.memory.size() == 7);
+
+    REQUIRE_NOTHROW(collector.mark_and_sweep());
+
+    REQUIRE(count_mem<Test_t>() == 3);
+    REQUIRE(collector.memory.size() == 3);
+  }
+}
+
 /* * * * * Class Level Unit Tests * * * * */
 
 TEST_CASE("Add items", "[memory][add]") {
@@ -280,7 +339,7 @@ TEST_CASE("Add items", "[memory][add]") {
   }
 }
 
-TEST_CASE("Add root items", "[memory][add][add-root]") {
+TEST_CASE("Add root items", "[memory][add][add_root]") {
   static Collector<Data_t>& collector = Collector<Data_t>::Collectable::collector;
   // Note since the Data_t has no possible Data_t childs,
   // (and thus, would not require a mark_and_sweep garbage collector)
